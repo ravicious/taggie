@@ -1,0 +1,12 @@
+[package]
+name = "taggie"
+version = "0.1.0"
+authors = ["Rafał Cieślak <ravicious@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tempfile = "3.0.4"
+id3 = "0.5.1"
+mp4ameta = "0.6.1"
