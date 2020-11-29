@@ -1,2 +1,4 @@
+pub mod audio_file;
 pub mod editor;
-pub mod tag;
+
+pub use audio_file::{AudioFile, UpdateError};
