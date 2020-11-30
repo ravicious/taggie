@@ -1,5 +1,6 @@
 use std::env;
-use std::process::{self};
+use std::process;
+use std::time::Instant;
 use taggie::editor;
 use taggie::{AudioFile, UpdateError};
 
@@ -19,6 +20,7 @@ fn main() -> Result<(), std::io::Error> {
         process::exit(1);
     });
 
+    let now = Instant::now();
     AudioFile::update_tags_from_edited_content(audio_files.as_mut_slice(), output).unwrap_or_else(
         |e| {
             if let UpdateError::UpdateAborted = e {
@@ -28,6 +30,12 @@ fn main() -> Result<(), std::io::Error> {
             }
             process::exit(1);
         },
+    );
+
+    println!(
+        "Updated {} tags in {} ms",
+        audio_files.len(),
+        now.elapsed().as_millis()
     );
 
     Ok(())
