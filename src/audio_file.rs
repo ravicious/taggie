@@ -2,28 +2,38 @@ use std::env;
 use std::fmt;
 use std::fs;
 use std::io::{self};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 pub struct AudioFile {
     path: PathBuf,
-    tag: Box<dyn Tag>,
+    file: taglib::File,
+}
+
+pub enum FileError {
+    NotAFile,
+    TaglibError(taglib::FileError),
+}
+
+impl From<taglib::FileError> for FileError {
+    fn from(error: taglib::FileError) -> Self {
+        FileError::TaglibError(error)
+    }
 }
 
 impl AudioFile {
-    pub fn new(path: PathBuf) -> Result<Self, io::Error> {
+    pub fn new(path: PathBuf) -> Result<Self, FileError> {
         let is_file = path
             .metadata()
             .map(|metadata| metadata.is_file())
             .unwrap_or(false);
 
         if !is_file {
-            return Err(io::Error::new(io::ErrorKind::Other, "not a file"));
+            return Err(FileError::NotAFile);
         }
 
-        let tag = Self::read_from_path(&path)
-            .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "not an audio file"))?;
+        let file = taglib::File::new(&path)?;
 
-        Ok(AudioFile { path, tag })
+        Ok(AudioFile { path, file })
     }
 
     pub fn collection_to_editable_content(audio_files: &[AudioFile]) -> String {
@@ -76,40 +86,35 @@ impl AudioFile {
     }
 
     pub fn to_editable_content_line(&self) -> String {
+        let tag = self
+            .file
+            .tag()
+            .expect("Failed to get tag inside to_editable_content_line");
+
         format!(
             "{}\t{}\n",
-            self.tag.title().unwrap_or_default(),
-            self.tag.artist().unwrap_or_default()
+            tag.title().unwrap_or_default(),
+            tag.artist().unwrap_or_default()
         )
     }
 
     pub fn update_tag_from_line(&mut self, line: &str) -> Result<(), UpdateError> {
+        let mut tag = match self.file.tag() {
+            Ok(tag) => tag,
+            Err(e) => return Err(UpdateError::CannotReadTag(e)),
+        };
+
         if let [title, artist] = line.split('\t').collect::<Vec<_>>()[..] {
-            self.tag.set_title(title);
-            self.tag.set_artist(artist);
-            self.tag
-                .write_to_path(&self.path)
-                .map_err(UpdateError::ExternalCrateError)
+            tag.set_title(title);
+            tag.set_artist(artist);
+
+            if self.file.save() {
+                Ok(())
+            } else {
+                Err(UpdateError::SaveFailed(self.path.clone()))
+            }
         } else {
             Err(UpdateError::InvalidLine(line.to_string()))
-        }
-    }
-
-    fn read_from_path(path: &Path) -> Option<Box<dyn Tag>> {
-        match path
-            .extension()
-            .and_then(|os_str| os_str.to_str())
-            .unwrap_or_default()
-            .to_lowercase()
-            .as_str()
-        {
-            "mp3" => id3::Tag::read_from_path(path)
-                .map(|tag| Box::new(tag) as Box<dyn Tag>)
-                .ok(),
-            "m4a" | "m4b" | "m4p" | "m4v" => mp4ameta::Tag::read_from_path(path)
-                .map(|tag| Box::new(tag) as Box<dyn Tag>)
-                .ok(),
-            _ => None,
         }
     }
 }
@@ -122,7 +127,8 @@ pub enum UpdateError {
         number_of_lines: usize,
     },
     InvalidLine(String),
-    ExternalCrateError(ExternalCrateError),
+    CannotReadTag(taglib::FileError),
+    SaveFailed(PathBuf),
 }
 
 impl fmt::Display for UpdateError {
@@ -146,83 +152,12 @@ impl fmt::Display for UpdateError {
                 "Expected the line to have format\n\n\t`title<TAB>artist`\n\nbut found this instead:\n\n\t{}",
                 invalid_line.replace('\t', "<TAB>")
             ),
-            ExternalCrateError(error) => write!(f, "Error from external library {:?}", error),
+            SaveFailed(path) => write!(f, "Failed to save updated tags to file {:?}", path.clone().into_os_string()),
+            CannotReadTag(error) => write!(f, "Failed to read tags from the file {:?}", error)
         }
     }
 }
 
 fn pluralize(count: usize, singular: &str, plural: &str) -> String {
     format!("{} {}", count, if count == 1 { singular } else { plural })
-}
-
-#[derive(Debug)]
-pub enum ExternalCrateError {
-    Id3(id3::Error),
-    Mp4ameta(mp4ameta::Error),
-}
-
-trait Tag: std::fmt::Debug {
-    fn artist(&self) -> Option<&str>;
-    fn album(&self) -> Option<&str>;
-    fn title(&self) -> Option<&str>;
-
-    fn set_artist(&mut self, new_value: &str);
-    fn set_album(&mut self, new_value: &str);
-    fn set_title(&mut self, new_value: &str);
-
-    fn write_to_path(&self, path: &Path) -> Result<(), ExternalCrateError>;
-}
-
-impl Tag for id3::Tag {
-    fn artist(&self) -> Option<&str> {
-        self.artist()
-    }
-    fn album(&self) -> Option<&str> {
-        self.album()
-    }
-    fn title(&self) -> Option<&str> {
-        self.title()
-    }
-
-    fn set_artist(&mut self, new_value: &str) {
-        self.set_artist(new_value);
-    }
-    fn set_album(&mut self, new_value: &str) {
-        self.set_album(new_value);
-    }
-    fn set_title(&mut self, new_value: &str) {
-        self.set_title(new_value);
-    }
-
-    fn write_to_path(&self, path: &Path) -> Result<(), ExternalCrateError> {
-        self.write_to_path(path, id3::Version::Id3v24)
-            .map_err(ExternalCrateError::Id3)
-    }
-}
-
-impl Tag for mp4ameta::Tag {
-    fn artist(&self) -> Option<&str> {
-        self.artist()
-    }
-    fn album(&self) -> Option<&str> {
-        self.album()
-    }
-    fn title(&self) -> Option<&str> {
-        self.title()
-    }
-
-    fn set_artist(&mut self, new_value: &str) {
-        self.set_artist(new_value);
-    }
-    fn set_album(&mut self, new_value: &str) {
-        self.set_album(new_value);
-    }
-    fn set_title(&mut self, new_value: &str) {
-        self.set_title(new_value);
-    }
-
-    fn write_to_path(&self, path: &Path) -> Result<(), ExternalCrateError> {
-        self.write_to_path(path)
-            .map_err(ExternalCrateError::Mp4ameta)
-    }
 }
