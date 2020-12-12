@@ -34,6 +34,14 @@ installing it on your computer should be rather straightforward. Check [the Inst
 from The Cargo Book](https://doc.rust-lang.org/cargo/getting-started/installation.html) for more
 details.
 
+After installing TagLib and Cargo, you can install Taggie with:
+
+```
+cargo install taggie
+```
+
+This is going to install a CLI tool `taggie`.
+
 ## Rationale
 
 From time to time I download a release from Bandcamp where the tags are messed up, especially when
