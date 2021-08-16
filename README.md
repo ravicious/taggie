@@ -9,6 +9,19 @@ Here's how it works:
 3. You edit the tags, save the file and exit the editor.
 4. Taggie updates the tags according to your changes.
 
+## Rationale
+
+From time to time I download a release from Bandcamp where the tags are messed up, especially when
+we're talking about compilation albums from various artists. [MusicBrainz
+Picard](https://picard.musicbrainz.org/) doesn't help there if the release is fresh.
+
+It's easy enough to modify the album or album artist tags in iTunes because it's setting one value
+for all tracks. However, sometimes there's more you need to change: the "title" tag is in the format
+"[title] - [artist]" or each title contains some junk that you want to remove.
+
+This requires some text processing capabilities, and—if you're a developer—what's better for text
+processing than your favorite text editor?
+
 ## Supported audio formats and tags
 
 Taggie edits tags through [TagLib](https://taglib.org/), so it aims to support whatever TagLib
@@ -41,19 +54,6 @@ cargo install taggie
 ```
 
 This is going to install a CLI tool `taggie`.
-
-## Rationale
-
-From time to time I download a release from Bandcamp where the tags are messed up, especially when
-we're talking about compilation albums from various artists. [MusicBrainz
-Picard](https://picard.musicbrainz.org/) doesn't help there if the release is fresh.
-
-It's easy enough to modify the album or album artist tags in iTunes because it's setting one value
-for all tracks. However, sometimes there's more you need to change: the "title" tag is in the format
-"[title] - [artist]" or each title contains some junk that you want to remove.
-
-This requires some text processing capabilities, and—if you're a developer—what's better for text
-processing than your favorite text editor?
 
 ## FAQ
 
